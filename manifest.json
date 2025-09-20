@@ -1,0 +1,26 @@
+{
+  "name": "Générateur de Rapports",
+  "short_name": "Rapports",
+  "description": "Application pour générer des rapports et gérer des fichiers.",
+  
+  "start_url": "/generateur-rapport/",
+  "scope": "/generateur-rapport/",
+  
+  "display": "standalone",
+  "background_color": "#1a2a6c",
+  "theme_color": "#2c3e50",
+  "icons": [
+    {
+      "src": "R.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "R.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

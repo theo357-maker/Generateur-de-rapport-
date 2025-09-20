@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur de Rapports & Gestionnaire de Fichiers</title>
+    
+    <!-- Inclusion des librairies externes pour la génération de PDF et les icônes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* === STYLES GÉNÉRAUX === */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Times New Roman', Times, serif; }
+        body { background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c ); padding: 40px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .main-container { width: 100%; max-width: 900px; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+        h1 { text-align: center; margin-bottom: 25px; color: #343a40; }
+
+        /* === STYLES DU FORMULAIRE === */
+        .form-section { 
+display: none;
+margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .section-title { font-weight: bold; margin-bottom: 15px; color: #495057; border-bottom: 1px solid #ced4da; padding-bottom: 5px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .optional { color: #7f8c8d; font-size: 12px; font-weight: normal; }
+
+        /* === STYLES DES TABLEAUX === */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        table th, table td { border: 1px solid #000; padding: 8px; text-align: left; }
+        table th { background-color: #f0f0f0; font-weight: bold; }
+        table input { width: 100%; padding: 5px; border: none; font-size: 14px; background: transparent; }
+
+        /* === STYLES DES BOUTONS === */
+        .button-container { display: flex; justify-content: center; margin-top: 25px; gap: 15px; }
+        .btn { padding: 12px 25px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; transition: all 0.3s; }
+        .btn-generate { background-color: #2c3e50; color: white; }
+        .btn-reset { background-color: #6c757d; color: white; }
+
+        /* === STYLES POUR LE TEMPLATE PDF (CACHÉ) === */
+        #pdf-template { width: 210mm; height: 297mm; padding: 10mm; font-family: 'Times New Roman', Times, serif; font-size: 12px; box-sizing: border-box; position: absolute; left: -9999px; background: white; color: black; border: 4px solid black; display: flex; justify-content: center; align-items: center; }
+        .pdf-main-content { width: 100%; height: 100%; border: 1px solid black; padding: 15px; display: flex; flex-direction: column; }
+        .pdf-header-container { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 10px; }
+        .pdf-header-left { display: flex; align-items: center; }
+        .pdf-logo-container { width: 50px; height: 50px; margin-right: 10px; display: flex; justify-content: center; align-items: center; }
+        #pdf-logo-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .pdf-logo-text { font-size: 11px; line-height: 1.2; }
+        .pdf-header-right { text-align: right; font-weight: bold; font-size: 11px; }
+        .pdf-header-right div { margin-bottom: 2px; }
+        .pdf-main-title { text-align: center; font-weight: bold; font-size: 15px; margin: 5px 0 10px 0; text-decoration: underline; padding: 2px 0; }
+        .pdf-body-container { display: flex; flex-grow: 1; border-top: 1px solid black; }
+        .pdf-left-column { width: 58%; padding: 10px 10px 0 0; border-right: 1px solid black; }
+        .pdf-right-column { width: 42%; padding: 10px 0 0 10px; position: relative; display: flex; flex-direction: column; }
+        .pdf-section { margin-bottom: 10px; }
+        .pdf-section-title { font-weight: bold; margin-bottom: 5px; }
+        .pdf-field { margin-bottom: 8px; }
+        .pdf-dotted-line { border-bottom: 1px dotted black; display: inline-block; min-height: 16px; vertical-align: bottom; padding: 0 3px; font-family: 'century schoolbook', sans-serif; font-size: 15px; font-weight: bold; color: #111; }
+        .pdf-cantiques-list { padding-left: 15px; }
+        .pdf-cantiques-list .pdf-field { margin-bottom: 5px; }
+        .pdf-tech-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; border: 1px solid black; padding: 8px; }
+        .pdf-tech-item { display: flex; align-items: center; font-size: 10px; }
+        .pdf-checkbox { width: 11px; height: 11px; margin-right: 5px; display: flex; justify-content: center; align-items: center; font-weight: bold; border: 1px solid black;}
+        .pdf-effectifs-table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 10px; }
+        .pdf-effectifs-table th, .pdf-effectifs-table td { border: 1px solid black; padding: 3px 4px; text-align: left; height: 24px; }
+        .pdf-effectifs-table th { background-color: #A9C4E2; color: black; text-align: center; font-weight: bold; }
+        .pdf-effectifs-table td { font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: bold; text-align: center; }
+        .pdf-effectifs-table td:first-child { text-align: center; font-family: 'Times New Roman', Times, serif; font-weight: normal; }
+        .pdf-effectifs-table .orchestre-row td { background-color: #A9C4E2; color: black; font-weight: bold; }
+        .pdf-effectifs-table .orchestre-row td:last-child { background-color: white; }
+        .pdf-effectifs-table .total-row td { background-color: #A9C4E2; color: black; font-weight: bold; text-align: right; padding-right: 5px; }
+        .pdf-effectifs-table .total-row td:last-child { background-color: white; text-align: center; }
+        .pdf-footer { margin-top: auto; padding-bottom: 10px; align-self: flex-end; width: 100%; }
+        .pdf-rapporteur-section { text-align: center; }
+        #pdf-signature-container { height: 40px; margin-bottom: 5px; display: flex; justify-content: center; align-items: center; }
+        #pdf-signature-img { max-width: 150px; max-height: 40px; object-fit: contain; }
+        .pdf-rapporteur-section .pdf-dotted-line { width: 130px; margin-top: 8px; }
+
+        /* === STYLES DIVERS === */
+        a { color:white; text-decoration: none; }
+        button { font-size:20px; background-color:black; padding:10px; margin:10px; border:0; border-radius:30px; color: white; }
+        #ftr { border-radius:10px; background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c); min-height: 8vh; padding: 5px; }
+
+        /* === STYLES POUR LE GESTIONNAIRE DE FICHIERS === */
+        #file-manager-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); z-index: 1000; }
+        .file-manager-content { position: relative; background: white; margin: 5% auto; padding: 20px; width: 90%; max-width: 900px; border-radius: 8px; max-height: 80vh; overflow-y: auto; }
+        .close { position: absolute; top: 10px; right: 15px; font-size: 28px; cursor: pointer; }
+        .file-manager-controls { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .file-manager-controls input[type="text"], .file-manager-controls input[type="date"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .file-manager-controls button { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 14px; margin: 0; }
+        .file-manager-controls label { padding: 8px 15px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 0; display: inline-flex; align-items: center; gap: 5px; }
+        #import-pdf { display: none; }
+        #pdf-list-container table { width: 100%; border-collapse: collapse; }
+        #pdf-list-container th, #pdf-list-container td { padding: 10px; border: 1px solid #ddd; text-align: left; vertical-align: middle; }
+        #pdf-list-container th { background-color: #f0f0f0; }
+        .action-btn { padding: 5px 10px; margin: 0 5px; border: none; border-radius: 4px; cursor: pointer; color: white; }
+        #no-results { text-align: center; padding: 20px; }
+        #open-file-manager { position: fixed; bottom: 20px; right: 20px; padding: 15px; background-color: #2c3e50; color: white; border: none; border-radius: 50%; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 100; }
+        #open-file-manager i, .action-btn i { font-size: 16px; }
+        .fa-brands { font-size: 24px; }
+
+        /* === STYLES POUR LA NOTIFICATION DE MISE À JOUR === */
+        .notification-update { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background-color: #2c3e50; color: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1001; display: none; align-items: center; gap: 20px; }
+        .notification-update.show { display: flex; }
+        #update-btn { padding: 8px 15px; border: none; background-color: #FFD700; color: #1a2a6c; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <img type="logo" src="R.png" width="240px" height="130px" alt="Logo principal">
+        <h1>Générateur de Rapports de Répétition</h1>
+        <div id="ftr"><button> <a href="index.html"><i class="fa-solid fa-arrow-left"></i>Retour Formulaire</a></button></div>
+        <h2>
+            <button type="button" onclick="window.open('https://wa.me/971877758', '_blank'  );">
+                Contactez-nous <i class="fa-brands fa-whatsapp"></i>
+            </button>
+        </h2>
+        
+        <form id="reportForm" onsubmit="return false;">
+            <!-- Toutes les sections du formulaire restent ici, inchangées -->
+            <!-- Par exemple: -->
+            <div class="form-section">
+                <div class="section-title">Informations d'en-tête</div>
+                <div class="form-grid">
+                    <div class="form-group"><label for="district">District:</label><input type="text" id="district" name="district"></div>
+                    <div class="form-group"><label for="sousDistrict">Sous-district:</label><input type="text" id="sousDistrict" name="sousDistrict"></div>
+                    <div class="form-group"><label for="communaute">Communauté:</label><input type="text" id="communaute" name="communaute"></div>
+                </div>
+            </div>
+            <div class="form-section">
+                <div class="section-title">Informations sur la répétition</div>
+                <div class="form-grid">
+                    <div class="form-group"><label for="date">Date: <span class="optional">(requis)</span></label><input type="date" id="date" name="date" required></div>
+                    <div class="form-group"><label for="tenuePar">Tenue par: <span class="optional">(requis)</span></label><input type="text" id="tenuePar" name="tenuePar" required></div>
+                    <!-- ... autres champs ... -->
+                </div>
+            </div>
+             <div class="form-section">
+                <div class="section-title">Rapporteur</div>
+                <div class="form-group">
+                    <label for="rapporteur">Nom du Rapporteur: <span class="optional">(requis)</span></label>
+                    <input type="text" id="rapporteur" name="rapporteur" required>
+                </div>
+                <div class="form-group">
+                    <label for="signatureUpload">Signature du Rapporteur (fichier image):</label>
+                    <input type="file" id="signatureUpload" name="signatureUpload" accept="image/png, image/jpeg">
+                </div>
+            </div>
+            <div class="button-container">
+                <button type="button" id="generateBtn" class="btn btn-generate">Générer le PDF</button>
+                <button type="reset" class="btn btn-reset">Réinitialiser</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Le template PDF caché reste ici, inchangé -->
+    <div id="pdf-template">
+        <!-- ... Contenu du template PDF ... -->
+    </div>
+
+    <!-- Fenêtre modale du gestionnaire de fichiers -->
+    <div id="file-manager-modal">
+        <div class="file-manager-content">
+            <span class="close" id="close-file-manager">&times;</span>
+            <h2 style="text-align: center; margin-bottom: 20px;">Gestionnaire de Fichiers</h2>
+            
+            <div class="file-manager-controls">
+                <div>
+                    <input type="text" id="search-name" placeholder="Rechercher par nom...">
+                    <label for="search-date" style="background: none; color: black; margin-left: 10px;">... ou par date:</label>
+                    <input type="date" id="search-date">
+                    <button id="clear-search" style="background-color: #6c757d;">Afficher Tout</button>
+                </div>
+                <div>
+                    <label for="import-pdf">
+                        <i class="fas fa-upload"></i> Importer Fichier
+                    </label>
+                    <input type="file" id="import-pdf">
+                </div>
+            </div>
+
+            <div id="pdf-list-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nom du Fichier</th>
+                            <th>Description</th>
+                            <th>Date d'ajout</th>
+                            <th style="text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pdf-list">
+                        <!-- Les fichiers seront listés ici dynamiquement -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div id="no-results" style="display: none;">
+                Aucun fichier trouvé.
+            </div>
+        </div>
+    </div>
+
+    <!-- Bouton flottant pour ouvrir le gestionnaire -->
+    <button id="open-file-manager">
+        <i class="fas fa-folder-open"></i>
+    </button>
+    
+    <!-- Notification de mise à jour (pour PWA) -->
+    <div id="update-notification" class="notification-update">
+        <span>Une nouvelle version est disponible !</span>
+        <button id="update-btn">Mettre à jour</button>
+    </div>
+
+
+    <!-- =================================================================== -->
+    <!-- SCRIPT JAVASCRIPT COMPLET ET CORRIGÉ                              -->
+    <!-- =================================================================== -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // ===================================================================
+        // SECTION 1 : INITIALISATION ET GESTION DU FORMULAIRE PDF
+        // ===================================================================
+        const { jsPDF } = window.jspdf;
+        const form = document.getElementById('reportForm');
+        const generateBtn = document.getElementById('generateBtn');
+        const effectifInputs = document.querySelectorAll('input[name="alto"], input[name="soprano"], input[name="tenor"], input[name="basse"], input[name="orchestre"]');
+        const totalGeneralInput = document.getElementById('totalGeneral');
+        const logoUploadInput = document.getElementById('logoUpload');
+        const pdfLogoImg = document.getElementById('pdf-logo-img');
+        const signatureUploadInput = document.getElementById('signatureUpload');
+        const pdfSignatureImg = document.getElementById('pdf-signature-img');
+
+        let logoDataUrl = 'R.png';
+        let signatureDataUrl = '';
+        if (pdfLogoImg) pdfLogoImg.src = logoDataUrl;
+
+        const readFileAsDataURL = (file) => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = (error) => reject(error);
+            reader.readAsDataURL(file);
+        });
+
+        if (logoUploadInput) {
+            logoUploadInput.addEventListener('change', async (event) => {
+                if (event.target.files[0]) {
+                    try { logoDataUrl = await readFileAsDataURL(event.target.files[0]); if (pdfLogoImg) pdfLogoImg.src = logoDataUrl; }
+                    catch (e) { console.error("Erreur chargement logo:", e); }
+                }
+            });
+        }
+
+        if (signatureUploadInput) {
+            signatureUploadInput.addEventListener('change', async (event) => {
+                if (event.target.files[0]) {
+                    try { signatureDataUrl = await readFileAsDataURL(event.target.files[0]); if (pdfSignatureImg) pdfSignatureImg.src = signatureDataUrl; }
+                    catch (e) { console.error("Erreur chargement signature:", e); }
+                }
+            });
+        }
+
+        function calculateTotal() {
+            let total = 0;
+            effectifInputs.forEach(input => { total += Number(input.value) || 0; });
+            if (totalGeneralInput) totalGeneralInput.value = total;
+        }
+        effectifInputs.forEach(input => input.addEventListener('input', calculateTotal));
+
+        if (generateBtn) {
+            generateBtn.addEventListener('click', async () => {
+                if (!form.checkValidity()) {
+                    alert('Veuillez remplir les champs requis.');
+                    form.reportValidity();
+                    return;
+                }
+                generateBtn.textContent = 'Génération...';
+                generateBtn.disabled = true;
+                try {
+                    await fillPdfTemplate();
+                    const canvas = await html2canvas(document.getElementById('pdf-template'), { scale: 3, useCORS: true });
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297);
+                    const community = document.getElementById('communaute') ? document.getElementById('communaute').value : 'INCONNUE';
+                    const date = document.getElementById('date') ? document.getElementById('date').value : '';
+                    const fileName = `RAPPORT_${community.replace(/\s+/g, '_')}_${date}.pdf`;
+                    pdf.save(fileName);
+                } catch (e) {
+                    console.error('Erreur génération PDF:', e);
+                    alert('Une erreur est survenue lors de la génération du PDF.');
+                } finally {
+                    generateBtn.textContent = 'Générer le PDF';
+                    generateBtn.disabled = false;
+                }
+            });
+        }
+
+        const waitForImageLoad = (img) => new Promise(resolve => {
+            if (!img || !img.src || (img.complete && img.naturalHeight !== 0)) resolve();
+            else { img.onload = resolve; img.onerror = resolve; }
+        });
+
+        async function fillPdfTemplate() {
+            // Cette fonction remplit les champs du template PDF. Elle est nécessaire.
+            const formData = new FormData(form);
+            const getValue = (key) => formData.get(key) || ' ';
+            const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+            
+            setText('pdf-district', getValue('district'));
+            setText('pdf-sousDistrict', getValue('sousDistrict'));
+            setText('pdf-communaute', getValue('communaute'));
+            // ... et ainsi de suite pour tous les champs du formulaire vers le PDF.
+            
+            if (pdfLogoImg) pdfLogoImg.src = logoDataUrl;
+            if (pdfSignatureImg) pdfSignatureImg.src = signatureDataUrl;
+            await Promise.all([waitForImageLoad(pdfLogoImg), waitForImageLoad(pdfSignatureImg)]);
+        }
+
+        // ===================================================================
+        // SECTION 2 : GESTIONNAIRE DE FICHIERS
+        // ===================================================================
+        const fileManagerModal = document.getElementById('file-manager-modal');
+        const fileListBody = document.getElementById('pdf-list');
+        const searchNameInput = document.getElementById('search-name');
+        const searchDateInput = document.getElementById('search-date');
+
+        document.getElementById('open-file-manager').addEventListener('click', () => {
+            fileManagerModal.style.display = 'block';
+            filterFiles();
+        });
+
+        document.getElementById('close-file-manager').addEventListener('click', () => {
+            fileManagerModal.style.display = 'none';
+        });
+
+        document.getElementById('import-pdf').addEventListener('change', (e) => {
+            if (e.target.files[0]) importFile(e.target.files[0]);
+            e.target.value = '';
+        });
+
+        searchNameInput.addEventListener('input', filterFiles);
+        searchDateInput.addEventListener('input', filterFiles);
+
+        document.getElementById('clear-search').addEventListener('click', () => {
+            searchNameInput.value = '';
+            searchDateInput.value = '';
+            filterFiles();
+        });
+
+        fileListBody.addEventListener('click', (e) => {
+            const button = e.target.closest('button.action-btn');
+            if (!button) return;
+            const action = button.dataset.action;
+            const index = parseInt(button.dataset.index, 10);
+            const file = getSavedFiles()[index];
+            if (!file) return;
+            if (action === 'view') viewFile(file.data, file.type);
+            else if (action === 'download') downloadFile(file.data, file.name, file.type);
+            else if (action === 'delete') deleteFile(index);
+        });
+
+        const getSavedFiles = () => JSON.parse(localStorage.getItem('savedFiles') || '[]');
+
+        function displayFileList(files) {
+            fileListBody.innerHTML = '';
+            document.getElementById('no-results').style.display = files.length === 0 ? 'block' : 'none';
+            files.forEach((file, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><i class="${getFileIcon(file.type, file.name)}" style="margin-right: 10px; color: #2c3e50;"></i>${file.name || ''}</td>
+                    <td>${file.description || 'Aucune'}</td>
+                    <td>${file.date || ''}</td>
+                    <td style="text-align: center;">
+                        <button title="Voir" class="action-btn" style="background-color:#17a2b8;" data-action="view" data-index="${index}"><i class="fas fa-eye"></i></button>
+                        <button title="Télécharger" class="action-btn" style="background-color:#28a745;" data-action="download" data-index="${index}"><i class="fas fa-download"></i></button>
+                        <button title="Supprimer" class="action-btn" style="background-color:#dc3545;" data-action="delete" data-index="${index}"><i class="fas fa-trash"></i></button>
+                    </td>`;
+                fileListBody.appendChild(row);
+            });
+        }
+
+        function filterFiles() {
+            const searchName = searchNameInput.value.toLowerCase();
+            const searchDate = searchDateInput.value;
+            const filtered = getSavedFiles().filter(file => 
+                (file.name ? file.name.toLowerCase().includes(searchName) : true) &&
+                (searchDate ? file.date === searchDate : true)
+            );
+            displayFileList(filtered);
+        }
+
+        function importFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const newFile = {
+                    name: file.name,
+                    type: file.type || 'application/octet-stream',
+                    date: new Date().toISOString().split('T')[0],
+                    description: prompt(`Description pour "${file.name}" (optionnel):`) || '',
+                    data: e.target.result.split(',')[1]
+                };
+                const files = getSavedFiles();
+                files.push(newFile);
+                localStorage.setItem('savedFiles', JSON.stringify(files));
+                alert(`"${file.name}" a été importé.`);
+                filterFiles();
+            };
+            reader.onerror = () => alert("Erreur de lecture du fichier.");
+            reader.readAsDataURL(file);
+        }
+
+        const base64ToBlob = (base64, mimeType) => {
+            try {
+                const byteCharacters = atob(base64);
+                const byteArrays = [];
+                for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+                    const slice = byteCharacters.slice(offset, offset + 512);
+                    const byteNumbers = new Array(slice.length);
+                    for (let i = 0; i < slice.length; i++) byteNumbers[i] = slice.charCodeAt(i);
+                    byteArrays.push(new Uint8Array(byteNumbers));
+                }
+                return new Blob(byteArrays, { type: mimeType });
+            } catch (e) { console.error("Erreur Base64->Blob:", e); return null; }
+        };
+
+        function viewFile(data, type) {
+            const blob = base64ToBlob(data, type);
+            if (blob) window.open(URL.createObjectURL(blob), '_blank');
+        }
+
+        function downloadFile(data, name, type) {
+            const blob = base64ToBlob(data, type);
+            if (!blob) return;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function deleteFile(index) {
+            if (confirm('Supprimer ce fichier ?')) {
+                const files = getSavedFiles();
+                files.splice(index, 1);
+                localStorage.setItem('savedFiles', JSON.stringify(files));
+                filterFiles();
+            }
+        }
+
+        function getFileIcon(mimeType = '', fileName = '') {
+            const ext = fileName.split('.').pop().toLowerCase();
+            if (mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'fas fa-file-image';
+            if (mimeType.includes('pdf') || ext === 'pdf') return 'fas fa-file-pdf';
+            if (mimeType.includes('word') || ['doc', 'docx'].includes(ext)) return 'fas fa-file-word';
+            if (mimeType.includes('excel') || ['xls', 'xlsx'].includes(ext)) return 'fas fa-file-excel';
+            if (mimeType.startsWith('audio/')) return 'fas fa-file-audio';
+            if (mimeType.startsWith('video/')) return 'fas fa-file-video';
+            return 'fas fa-file-alt';
+        }
+
+        // Le code du Service Worker (PWA) reste inchangé
+    
+
+
+        // ... (Le code du Service Worker reste le même) ...
+// --- GESTION DES MISES À JOUR DU SERVICE WORKER ---
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+        .then(registration => {
+            console.log('Service Worker enregistré avec succès:', registration.scope);
+
+            // On vérifie s'il y a déjà un Service Worker en attente (waiting)
+            if (registration.waiting) {
+                showUpdateNotification(registration.waiting);
+                return;
+            }
+
+            // On écoute les futures mises à jour
+            registration.addEventListener('updatefound', () => {
+                console.log('Service Worker: Nouvelle version trouvée.');
+                const newWorker = registration.installing;
+                
+                // On attend que le nouveau worker soit installé
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed') {
+                        // Si un nouveau worker est installé et en attente, on affiche la notification
+                        if (navigator.serviceWorker.controller) {
+                            showUpdateNotification(newWorker);
+                        }
+                    }
+                });
+            });
+        })
+        .catch(error => {
+            console.log('Échec de l\'enregistrement du Service Worker:', error);
+        });
+    });
+}
+
+function showUpdateNotification(worker) {
+    const notification = document.getElementById('update-notification');
+    const updateButton = document.getElementById('update-btn');
+
+    notification.classList.add('show');
+
+    updateButton.addEventListener('click', () => {
+        // Envoie le message au Service Worker pour qu'il s'active
+        worker.postMessage({ type: 'SKIP_WAITING' });
+        
+        // Une fois que le nouveau worker a pris le contrôle, on recharge la page
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            window.location.reload();
+        });
+    });
+}
+
+
+
+    });
+    </script>
+</body>
+</html>

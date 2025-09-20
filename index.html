@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur de Rapports de Répétition</title>
+    
+    <!-- Inclusion des librairies externes pour la génération de PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- Inclusion de Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- === CONFIGURATION PWA (POUR L'ÉCRAN D'ACCUEIL ) === -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Rapports Répétition">
+    <link rel="apple-touch-icon" href="icon-192x192.png">
+    <!-- =================================================== -->
+
+   <style>
+        /* === STYLES GÉNÉRAUX === */
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            font-family: 'Times New Roman', Times, serif; 
+        }
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c);
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .main-container {
+            width: 100%;
+            max-width: 900px;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        h1 { 
+            text-align: center; 
+            margin-bottom: 25px; 
+            color: #343a40; 
+        }
+
+        /* === STYLES DU FORMULAIRE === */
+        .form-section { 
+            margin-bottom: 20px; 
+            padding: 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+        }
+        .section-title { 
+            font-weight: bold; 
+            margin-bottom: 15px; 
+            color: #495057; 
+            border-bottom: 1px solid #ced4da; 
+            padding-bottom: 5px; 
+        }
+        .form-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 15px; 
+        }
+        .form-group { 
+            margin-bottom: 12px; 
+        }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 5px; 
+            font-weight: 500; 
+        }
+        .form-group input, .form-group textarea { 
+            width: 100%; 
+            padding: 8px; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+            font-size: 14px; 
+        }
+        .form-group textarea { 
+            min-height: 80px; 
+            resize: vertical; 
+        }
+        .optional { 
+            color: #7f8c8d; 
+            font-size: 12px; 
+            font-weight: normal; 
+        }
+
+        /* === STYLES DES TABLEAUX === */
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 15px; 
+        }
+        table th, table td { 
+            border: 1px solid #000; 
+            padding: 8px; 
+            text-align: left; 
+        }
+        table th { 
+            background-color: #f0f0f0; 
+            font-weight: bold; 
+        }
+        table input { 
+            width: 100%; 
+            padding: 5px; 
+            border: none; 
+            font-size: 14px; 
+            background: transparent; 
+        }
+
+        /* === STYLES DES BOUTONS === */
+        .button-container { 
+            display: flex; 
+            justify-content: center; 
+            margin-top: 25px; 
+            gap: 15px; 
+        }
+        .btn { 
+            padding: 12px 25px; 
+            border: none; 
+            border-radius: 4px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: all 0.3s; 
+        }
+        .btn-generate { 
+            background-color: #2c3e50; 
+            color: white; 
+        }
+        .btn-reset { 
+            background-color: #6c757d; 
+            color: white; 
+        }
+
+        /* === STYLES POUR LE TEMPLATE PDF (CACHÉ) === */
+        #pdf-template {
+            width: 220mm; /* Format A4 */
+            height: 230mm; /* Format A4 */
+            padding: 8mm;
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 12px;
+            box-sizing: border-box;
+            position: absolute;
+            left: -9999px; /* Cache l'élément hors de l'écran */
+            background: white;
+            color: black;
+            border: 4px solid black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .pdf-main-content {
+            width: 100%;
+            height: 100%;
+            border: 1px solid black;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+        .pdf-header-container { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 10px; }
+        .pdf-header-left { display: flex; align-items: center; }
+        .pdf-logo-container { width: 50px; height: 50px; margin-right: 10px; display: flex; justify-content: center; align-items: center; }
+        #pdf-logo-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .pdf-logo-text { font-size: 11px; line-height: 1.2; }
+        .pdf-header-right { text-align: right; font-weight: bold; font-size: 11px; }
+        .pdf-header-right div { margin-bottom: 2px; }
+        .pdf-main-title { text-align: center; font-weight: bold; font-size: 15px; margin: 5px 0 10px 0; text-decoration: underline; padding: 2px 0; }
+        .pdf-body-container { display: flex; flex-grow: 1; border-top: 1px solid black; }
+        .pdf-left-column { width: 58%; padding: 10px 10px 0 0; border-right: 1px solid black; }
+        .pdf-right-column { width: 42%; padding: 10px 0 0 10px; position: relative; display: flex; flex-direction: column; }
+        .pdf-section { margin-bottom: 10px; }
+        .pdf-section-title { font-weight: bold; margin-bottom: 5px; }
+        .pdf-field { margin-bottom: 8px; }
+        .pdf-dotted-line { 
+            border-bottom: 1px dotted black; 
+            display: inline-block; 
+            min-height: 16px; 
+            vertical-align: bottom; 
+            padding: 0 3px; 
+            font-family: 'century schoolbook', sans-serif;
+            font-size: 15px;
+            font-weight: bold;
+            color: #111;
+        }
+        .pdf-cantiques-list { padding-left: 15px; }
+        .pdf-cantiques-list .pdf-field { margin-bottom: 5px; }
+        .pdf-tech-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; border: 1px solid black; padding: 8px; }
+        .pdf-tech-item { display: flex; align-items: center; font-size: 10px; }
+        .pdf-checkbox { width: 11px; height: 11px; margin-right: 5px; display: flex; justify-content: center; align-items: center; font-weight: bold; border: 1px solid black;}
+        .pdf-effectifs-table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 10px; }
+        .pdf-effectifs-table th, .pdf-effectifs-table td { border: 1px solid black; padding: 3px 4px; text-align: left; height: 24px; }
+        .pdf-effectifs-table th { background-color: #A9C4E2; color: black; text-align: center; font-weight: bold; }
+        .pdf-effectifs-table td { font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: bold; text-align: center; }
+        .pdf-effectifs-table td:first-child { text-align: center; font-family: 'Times New Roman', Times, serif; font-weight: normal; }
+        .pdf-effectifs-table .orchestre-row td { background-color: #A9C4E2; color: black; font-weight: bold; }
+        .pdf-effectifs-table .orchestre-row td:last-child { background-color: white; }
+        .pdf-effectifs-table .total-row td { background-color: #A9C4E2; color: black; font-weight: bold; text-align: right; padding-right: 5px; }
+        .pdf-effectifs-table .total-row td:last-child { background-color: white; text-align: center; }
+        .pdf-footer { margin-top: auto; padding-bottom: 10px; align-self: flex-end; width: 100%; }
+        .pdf-rapporteur-section { text-align: center; }
+        
+        /* MODIFIÉ: Style pour le conteneur de la signature */
+        #pdf-signature-container { 
+            height: 40px; /* Hauteur fixe pour l'espace de la signature */
+            margin-bottom: 5px; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+        }
+        #pdf-signature-img { 
+            max-width: 150px; /* Largeur maximale de l'image */
+            max-height: 40px; /* Hauteur maximale de l'image */
+            object-fit: contain; /* Assure que l'image s'adapte sans être déformée */
+        }
+        .pdf-rapporteur-section .pdf-dotted-line { 
+            width: 130px; 
+            margin-top: 8px; /* Réduit l'espace au-dessus du nom */
+        }
+
+        /* === STYLES DIVERS === */
+        a { color:white; text-decoration: none; }
+        i { color: #075E54; }
+        button { font-size:20px; background-color:black; padding:10px; margin:10px; border:0; border-radius:30px; color: white; }
+        #ftr {
+            border-radius:10px;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c);
+            min-height: 8vh;
+            padding: 5px;
+        }
+/* ... (tous vos styles CSS existants) ... */
+
+/* Style pour la notification de mise à jour */
+.notification-update {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #2c3e50; /* Un bleu foncé */
+    color: white;
+    padding: 15px 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    z-index: 1001; /* Au-dessus de tout le reste */
+    display: none; /* Caché par défaut */
+    align-items: center;
+    gap: 20px;
+}
+
+.notification-update.show {
+    display: flex; /* Affiché quand la classe 'show' est ajoutée */
+}
+
+#update-btn {
+    padding: 8px 15px;
+    border: none;
+    background-color: #FFD700; /* Jaune doré */
+    color: #1a2a6c; /* Bleu ENA */
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+
+<!-- ... (tout votre contenu HTML existant) ... -->
+
+    <!-- ================================== -->
+    <!-- NOTIFICATION DE MISE À JOUR        -->
+    <!-- ================================== -->
+    <div id="update-notification" class="notification-update">
+        <span>Une nouvelle version est disponible !</span>
+        <button id="update-btn">Mettre à jour</button>
+    </div>
+
+    <script>
+        // ... (tout votre code JavaScript existant) ...
+    </script>
+</body>
+</html>
+
+        <img type="logo" src="R.png" width="240px" height="130px" alt="Logo principal">
+        <h1>Générateur de Rapports de Répétition</h1>
+
+        <div id="ftr">
+
+   <button id="gestionnairePDF"><a href="gestionnaire.html">Fichier PDF<i class="fa-chisel fa-regular fa-arrow-right"></i></a></button></div>
+        <h2>
+            <button type="button" onclick="window.open('https://wa.me/971877758', '_blank' );">
+                Contactez-nous <i class="fa-brands fa-whatsapp" style="font-size:24px;"></i>
+            </button>
+
+
+        </h2>
+        
+        <form id="reportForm" onsubmit="return false;">
+            
+            <div class="form-section">
+                <div class="section-title">Logo de l'organisation</div>
+                <div class="form-group">
+                    <label for="logoUpload">Choisissez un fichier image (PNG, JPG):</label>
+                    <input type="file" id="logoUpload" name="logoUpload" accept="image/png, image/jpeg">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="section-title">Informations d'en-tête</div>
+                <div class="form-grid">
+                    <div class="form-group"><label for="district">District:</label><input type="text" id="district" name="district"></div>
+                    <div class="form-group"><label for="sousDistrict">Sous-district:</label><input type="text" id="sousDistrict" name="sousDistrict"></div>
+                    <div class="form-group"><label for="communaute">Communauté:</label><input type="text" id="communaute" name="communaute"></div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="section-title">Informations sur la répétition</div>
+                <div class="form-grid">
+                    <div class="form-group"><label for="date">Date: <span class="optional">(requis)</span></label><input type="date" id="date" name="date" required></div>
+                    <div class="form-group"><label for="heureDebut">Heure de début:</label><input type="time" id="heureDebut" name="heureDebut"></div>
+                    <div class="form-group"><label for="heureFin">Heure de fin:</label><input type="time" id="heureFin" name="heureFin"></div>
+                    <div class="form-group"><label for="lieu">Lieu:</label><input type="text" id="lieu" name="lieu"></div>
+                    <div class="form-group"><label for="tenuePar">Tenue par: <span class="optional">(requis)</span></label><input type="text" id="tenuePar" name="tenuePar" required></div>
+                    <div class="form-group"><label for="assistePar1">Assisté par 1:</label><input type="text" id="assistePar1" name="assistePar1"></div>
+                    <div class="form-group"><label for="assistePar2">Assisté par 2:</label><input type="text" id="assistePar2" name="assistePar2"></div>
+                    <div class="form-group"><label for="assistePar3">Assisté par 3:</label><input type="text" id="assistePar3" name="assistePar3"></div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="section-title">Cantiques</div>
+                <div class="form-grid">
+                    <div class="form-group"><label for="cantiqueAppris1">Cantique appris 1:</label><input type="text" id="cantiqueAppris1" name="cantiqueAppris1"></div>
+                    <div class="form-group"><label for="cantiqueAppris2">Cantique appris 2:</label><input type="text" id="cantiqueAppris2" name="cantiqueAppris2"></div>
+                    <div class="form-group"><label for="cantiqueAppris3">Cantique appris 3:</label><input type="text" id="cantiqueAppris3" name="cantiqueAppris3"></div>
+                    <div class="form-group"><label for="cantiqueRepete1">Cantique répété 1:</label><input type="text" id="cantiqueRepete1" name="cantiqueRepete1"></div>
+                    <div class="form-group"><label for="cantiqueRepete2">Cantique répété 2:</label><input type="text" id="cantiqueRepete2" name="cantiqueRepete2"></div>
+                    <div class="form-group"><label for="cantiqueRepete3">Cantique répété 3:</label><input type="text" id="cantiqueRepete3" name="cantiqueRepete3"></div>
+                    <div class="form-group"><label for="cantiqueArrange1">Cantique arrangé 1:</label><input type="text" id="cantiqueArrange1" name="cantiqueArrange1"></div>
+                    <div class="form-group"><label for="cantiqueArrange2">Cantique arrangé 2:</label><input type="text" id="cantiqueArrange2" name="cantiqueArrange2"></div>
+                    <div class="form-group"><label for="cantiqueArrange3">Cantique arrangé 3:</label><input type="text" id="cantiqueArrange3" name="cantiqueArrange3"></div>
+                    <div class="form-group"><label for="cantiqueArrange4">Cantique arrangé 4:</label><input type="text" id="cantiqueArrange4" name="cantiqueArrange4"></div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="section-title">Objectif opérationnel</div>
+                <div class="form-group"><textarea id="objectif" name="objectif"></textarea></div>
+            </div>
+
+            <div class="form-section">
+                <div class="section-title">Détails techniques appliquées</div>
+                 <div class="form-grid">
+                    <div class="form-group"><label><input type="checkbox" name="phrases_check"> Phrasés</label></div>
+                    <div class="form-group"><label><input type="checkbox" name="nuance_check"> Nuance</label></div>
+                    <div class="form-group"><label><input type="checkbox" name="modulation_check"> Modulation</label></div>
+                    <div class="form-group"><label><input type="checkbox" name="diction_check"> Diction</label></div>
+                    <div class="form-group"><label><input type="checkbox" name="lecturePartition_check"> Lecture partition</label></div>
+                    <div class="form-group"><label><input type="checkbox" name="tempo_check"> Tempo & Changement</label></div>
+                    <div class="form-group"><label><input type="checkbox" name="style_check"> Style</label></div>
+                    <div class="form-group"><label><input type="checkbox" name="expression_check"> Expression</label></div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="section-title">Effectifs</div>
+                <table>
+                    <thead><tr><th>N°</th><th>VOIX</th><th>TOTAL</th></tr></thead>
+                    <tbody>
+                        <tr><td>1</td><td>ALTO</td><td><input type="number" name="alto" min="0"></td></tr>
+                        <tr><td>2</td><td>SOPRANO</td><td><input type="number" name="soprano" min="0"></td></tr>
+                        <tr><td>3</td><td>TENOR</td><td><input type="number" name="tenor" min="0"></td></tr>
+                        <tr><td>4</td><td>BASSE</td><td><input type="number" name="basse" min="0"></td></tr>
+                        <tr><td></td><td>ORCHESTRE</td><td><input type="number" name="orchestre" min="0"></td></tr>
+                        <tr><td></td><td><strong>TOTAL GÉNÉRAL</strong></td><td><input type="number" name="totalGeneral" id="totalGeneral" readonly></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="form-section">
+                <div class="section-title">Remarques</div>
+                <div class="form-group"><textarea id="remarques" name="remarques"></textarea></div>
+            </div>
+
+            <!-- MODIFIÉ: Section Rapporteur avec champ pour la signature -->
+            <div class="form-section">
+                <div class="section-title">Rapporteur</div>
+                <div class="form-group">
+                    <label for="rapporteur">Nom du Rapporteur: <span class="optional">(requis)</span></label>
+                    <input type="text" id="rapporteur" name="rapporteur" required>
+                </div>
+                <!-- NOUVEAU: Champ pour la signature -->
+                <div class="form-group">
+                    <label for="signatureUpload">Signature du Rapporteur (fichier image):</label>
+                    <input type="file" id="signatureUpload" name="signatureUpload" accept="image/png, image/jpeg">
+                </div>
+            </div>
+
+            <div class="button-container">
+                <button type="button" id="generateBtn" class="btn btn-generate">Générer le PDF</button>
+                <button type="reset" class="btn btn-reset">Réinitialiser</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- =================== TEMPLATE PDF (ÉLÉMENT CACHÉ) ================== -->
+    <!-- =================================================================== -->
+    <div id="pdf-template">
+        <div class="pdf-main-content">
+            <div class="pdf-header-container">
+                <div class="pdf-header-left">
+                    <div class="pdf-logo-container"><img id="pdf-logo-img" src="R.png" alt="Logo"></div>
+                    <div class="pdf-logo-text"><div>Église néo-apostolique</div><div>RDC Sud-Est</div></div>
+                </div>
+                <div class="pdf-header-right">
+                    <div>EGLISE NÉO-APOSTOLIQUE DE LA RDC SUD-EST</div><div>RÉGION APOSTOLIQUE DU SUD</div><div>CAA DE LUBUMBASHI NORD</div>
+                    <div>DISTRICT DE : <span id="pdf-district" class="pdf-dotted-line" style="width:150px;"></span></div>
+                    <div>SOUS-DISTRICT DE : <span id="pdf-sousDistrict" class="pdf-dotted-line" style="width:128px;"></span></div>
+                    <div>COMMUNAUTE DE : <span id="pdf-communaute" class="pdf-dotted-line" style="width:140px;"></span></div>
+                </div>
+            </div>
+            <div class="pdf-main-title">RAPPORT DE LA RÉPÉTITION</div>
+            <div class="pdf-body-container">
+                <div class="pdf-left-column">
+                    <div class="pdf-section">
+                        <div class="pdf-field">Jour & Date : <span id="pdf-jourDate" class="pdf-dotted-line" style="width: 250px;"></span></div>
+                        <div class="pdf-field">Heure : de <span id="pdf-heureDebut" class="pdf-dotted-line" style="width: 80px;"></span> à <span id="pdf-heureFin" class="pdf-dotted-line" style="width: 80px;"></span></div>
+                        <div class="pdf-field">Lieu : <span id="pdf-lieu" class="pdf-dotted-line" style="width: 300px;"></span></div>
+                        <div class="pdf-field">Tenue par : <span id="pdf-tenuePar" class="pdf-dotted-line" style="width: 275px;"></span></div>
+                        <div class="pdf-field">Assisté par : 1. <span id="pdf-assistePar1" class="pdf-dotted-line" style="width: 260px;"></span></div>
+                        <div class="pdf-field" style="padding-left: 88px;">2. <span id="pdf-assistePar2" class="pdf-dotted-line" style="width: 260px;"></span></div>
+                        <div class="pdf-field" style="padding-left: 88px;">3. <span id="pdf-assistePar3" class="pdf-dotted-line" style="width: 260px;"></span></div>
+                    </div>
+                    <div class="pdf-section">
+                        <div class="pdf-section-title">Cantiques appris :</div>
+                        <div class="pdf-cantiques-list">
+                            <div class="pdf-field">1. <span id="pdf-cantiqueAppris1" class="pdf-dotted-line" style="width: 300px;"></span></div>
+                            <div class="pdf-field">2. <span id="pdf-cantiqueAppris2" class="pdf-dotted-line" style="width: 300px;"></span></div>
+                            <div class="pdf-field">3. <span id="pdf-cantiqueAppris3" class="pdf-dotted-line" style="width: 300px;"></span></div>
+                        </div>
+                    </div>
+                    <div class="pdf-section">
+                        <div class="pdf-section-title">Cantiques répétés :</div>
+                        <div class="pdf-cantiques-list">
+                            <div class="pdf-field">1. <span id="pdf-cantiqueRepete1" class="pdf-dotted-line" style="width: 300px;"></span></div>
+                            <div class="pdf-field">2. <span id="pdf-cantiqueRepete2" class="pdf-dotted-line" style="width: 300px;"></span></div>
+                            <div class="pdf-field">3. <span id="pdf-cantiqueRepete3" class="pdf-dotted-line" style="width: 300px;"></span></div>
+                        </div>
+                    </div>
+                    <div class="pdf-section">
+                        <div class="pdf-section-title">Cantiques arrangés :</div>
+                        <div class="pdf-cantiques-list">
+                            <div class="pdf-field">1. <span id="pdf-cantiqueArrange1" class="pdf-dotted-line" style="width: 300px;"></span></div>
+                            <div class="pdf-field">2. <span id="pdf-cantiqueArrange2" class="pdf-dotted-line" style="width: 300px;"></span></div>
+                            <div class="pdf-field">3. <span id="pdf-cantiqueArrange3" class="pdf-dotted-line" style="width: 300px;"></span></div>
+                            <div class="pdf-field">4. <span id="pdf-cantiqueArrange4" class="pdf-dotted-line" style="width: 300px;"></span></div>
+                        </div>
+                    </div>
+                    <div class="pdf-section">
+                        <div class="pdf-section-title">Objectif opérationnel de la répétition :</div>
+                        <div id="pdf-objectif" class="pdf-dotted-line" style="width: 100%; min-height: 40px; display: block;"></div>
+                    </div>
+                </div>
+                <div class="pdf-right-column">
+                    <div class="pdf-section">
+                        <div class="pdf-section-title">Détails techniques appliquées:</div>
+                        <div class="pdf-tech-grid">
+                            <div class="pdf-tech-item"><div id="pdf-phrases_check" class="pdf-checkbox"></div>Phrasés</div>
+                            <div class="pdf-tech-item"><div id="pdf-nuance_check" class="pdf-checkbox"></div>Nuance</div>
+                            <div class="pdf-tech-item"><div id="pdf-modulation_check" class="pdf-checkbox"></div>Modulation</div>
+                            <div class="pdf-tech-item"><div id="pdf-diction_check" class="pdf-checkbox"></div>Diction</div>
+                            <div class="pdf-tech-item"><div id="pdf-lecturePartition_check" class="pdf-checkbox"></div>Lecture partition</div>
+                            <div class="pdf-tech-item"><div id="pdf-tempo_check" class="pdf-checkbox"></div>Tempo</div>
+                            <div class="pdf-tech-item"><div id="pdf-style_check" class="pdf-checkbox"></div>Style</div>
+                            <div class="pdf-tech-item"><div id="pdf-expression_check" class="pdf-checkbox"></div>Expression</div>
+                        </div>
+                    </div>
+                    <div class="pdf-section">
+                        <div class="pdf-section-title">Effectifs :</div>
+                        <table class="pdf-effectifs-table">
+                            <thead><tr><th>N°</th><th>VOIX</th><th>TOTAL</th></tr></thead>
+                            <tbody>
+                                <tr><td>1</td><td>ALTO</td><td id="pdf-alto"></td></tr>
+                                <tr><td>2</td><td>SOPRANO</td><td id="pdf-soprano"></td></tr>
+                                <tr><td>3</td><td>TENOR</td><td id="pdf-tenor"></td></tr>
+                                <tr><td>4</td><td>BASSE</td><td id="pdf-basse"></td></tr>
+                                <tr class="orchestre-row"><td></td><td>ORCHESTRE</td><td id="pdf-orchestre"></td></tr>
+                                <tr class="total-row"><td></td><td>TOTAL GÉNÉRAL</td><td id="pdf-totalGeneral"></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pdf-section">
+                        <div class="pdf-section-title">Remarques :</div>
+                        <div id="pdf-remarques" class="pdf-dotted-line" style="width: 100%; min-height: 60px; display: block;"></div>
+                    </div>
+                    <div class="pdf-footer">
+                        <div class="pdf-rapporteur-section">
+                            <div>Rapporteur</div>
+                            <!-- MODIFIÉ: Le nom du rapporteur est maintenant au-dessus de la signature -->
+                            <div id="pdf-rapporteur" class="pdf-dotted-line"></div>
+                            <!-- Conteneur pour l'image de la signature -->
+                            <div id="pdf-signature-container">
+                                <img id="pdf-signature-img" src="" alt="Signature">
+                            </div>
+                 
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+
+    <script>
+        // ... (tout votre code JavaScript existant) ...
+    
+
+
+
+
+    
+     document.addEventListener('DOMContentLoaded', function() {
+    // Initialisation de la librairie jsPDF
+    const { jsPDF } = window.jspdf;
+
+    // Récupération des éléments du DOM
+    const form = document.getElementById('reportForm');
+    const generateBtn = document.getElementById('generateBtn');
+    const effectifInputs = document.querySelectorAll('input[name="alto"], input[name="soprano"], input[name="tenor"], input[name="basse"], input[name="orchestre"]');
+    const totalGeneralInput = document.getElementById('totalGeneral');
+    
+    // Éléments pour le logo
+    const logoUploadInput = document.getElementById('logoUpload');
+    const pdfLogoImg = document.getElementById('pdf-logo-img');
+    
+    // Éléments pour la signature
+    const signatureUploadInput = document.getElementById('signatureUpload');
+    const pdfSignatureImg = document.getElementById('pdf-signature-img');
+
+    // Variables pour stocker les données des images (DataURL)
+    let logoDataUrl = 'R.png'; // Chemin vers le logo par défaut
+    let signatureDataUrl = ''; // La signature est vide par défaut
+
+    // Initialise l'image du logo dans le template PDF avec la valeur par défaut
+    pdfLogoImg.src = logoDataUrl;
+
+    // --- GESTIONNAIRES D'ÉVÉNEMENTS ---
+
+    // 1. Gère le changement de fichier pour le logo
+    logoUploadInput.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                logoDataUrl = e.target.result; // Stocke l'image en DataURL
+                pdfLogoImg.src = logoDataUrl;   // Met à jour l'aperçu dans le template
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // 2. Gère le changement de fichier pour la signature
+    signatureUploadInput.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                signatureDataUrl = e.target.result; // Stocke l'image en DataURL
+                pdfSignatureImg.src = signatureDataUrl; // Met à jour l'aperçu dans le template
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // 3. Calcule le total des effectifs à chaque modification
+    effectifInputs.forEach(input => input.addEventListener('input', calculateTotal));
+
+    // 4. Gère le clic sur le bouton "Générer le PDF"
+    generateBtn.addEventListener('click', function() {
+        // Vérifie si les champs requis du formulaire sont remplis
+        if (!form.checkValidity()) {
+            alert('Veuillez remplir les champs obligatoires (date, tenue par, rapporteur).');
+            form.reportValidity(); // Affiche les messages de validation du navigateur
+            return;
+        }
+
+        // Désactive le bouton pour éviter les clics multiples
+        const originalText = generateBtn.textContent;
+        generateBtn.textContent = 'Génération en cours...';
+        generateBtn.disabled = true;
+
+        // Remplit le template PDF avec les données du formulaire
+        fillPdfTemplate();
+
+        // Utilise html2canvas pour convertir le template HTML en image
+        html2canvas(document.getElementById('pdf-template'), {
+            scale: 3, // Améliore la résolution de l'image
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff'
+        }).then(canvas => {
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4'); // Crée un PDF au format A4 portrait
+
+            // Ajoute l'image générée au PDF
+            pdf.addImage(imgData, 'PNG', 0, 0, 210, 297); // 210x297mm = format A4
+
+            // Crée un nom de fichier dynamique
+            const date = new Date().toISOString().split('T')[0];
+            const community = document.getElementById('communaute').value || 'INCONNUE';
+            const fileName = `RAPPORT_REPETITION_${community.replace(/\s+/g, '_').toUpperCase()}_${date}.pdf`;
+            
+            // Sauvegarde le fichier PDF
+            pdf.save(fileName);
+
+            // Réactive le bouton
+            generateBtn.textContent = originalText;
+            generateBtn.disabled = false;
+        }).catch(error => {
+            console.error('Erreur lors de la génération du PDF:', error);
+            alert('Une erreur est survenue. Assurez-vous que les fichiers image (logo, signature) sont valides.');
+            generateBtn.textContent = originalText;
+            generateBtn.disabled = false;
+        });
+    });
+
+    // --- FONCTIONS UTILITAIRES ---
+
+    // Calcule et met à jour le total général des effectifs
+    function calculateTotal() {
+        let total = 0;
+        effectifInputs.forEach(input => {
+            total += Number(input.value) || 0;
+        });
+        totalGeneralInput.value = total;
+    }
+
+    // Formate une date (ex: "2023-10-27") en "Vendredi 27/10/2023"
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        // Corrige le décalage horaire pour éviter les erreurs de date
+        const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+        const adjustedDate = new Date(date.getTime() + userTimezoneOffset);
+        if (isNaN(adjustedDate.getTime())) return '';
+        const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+        return `${days[adjustedDate.getDay()]} ${adjustedDate.getDate().toString().padStart(2, '0')}/${(adjustedDate.getMonth() + 1).toString().padStart(2, '0')}/${adjustedDate.getFullYear()}`;
+    }
+
+    // Formate une heure (ex: "14:30") en "14h30"
+    function formatTime(timeString) {
+        if (!timeString) return '';
+        const [hours, minutes] = timeString.split(':');
+        return `${hours}h${minutes}`;
+    }
+
+    // Remplit tous les champs du template PDF avec les données du formulaire
+    function fillPdfTemplate() {
+        const formData = new FormData(form);
+        const getValue = (key) => formData.get(key) || ' ';
+        const isChecked = (key) => formData.has(key);
+
+        // Mise à jour des images
+        pdfLogoImg.src = logoDataUrl;
+        pdfSignatureImg.src = signatureDataUrl;
+
+        // Remplissage des champs de texte
+        document.getElementById('pdf-district').textContent = getValue('district');
+        document.getElementById('pdf-sousDistrict').textContent = getValue('sousDistrict');
+        document.getElementById('pdf-communaute').textContent = getValue('communaute');
+        document.getElementById('pdf-jourDate').textContent = formatDate(getValue('date'));
+        document.getElementById('pdf-heureDebut').textContent = formatTime(getValue('heureDebut'));
+        document.getElementById('pdf-heureFin').textContent = formatTime(getValue('heureFin'));
+        document.getElementById('pdf-lieu').textContent = getValue('lieu');
+        document.getElementById('pdf-tenuePar').textContent = getValue('tenuePar');
+        document.getElementById('pdf-assistePar1').textContent = getValue('assistePar1');
+        document.getElementById('pdf-assistePar2').textContent = getValue('assistePar2');
+        document.getElementById('pdf-assistePar3').textContent = getValue('assistePar3');
+        document.getElementById('pdf-cantiqueAppris1').textContent = getValue('cantiqueAppris1');
+        document.getElementById('pdf-cantiqueAppris2').textContent = getValue('cantiqueAppris2');
+        document.getElementById('pdf-cantiqueAppris3').textContent = getValue('cantiqueAppris3');
+        document.getElementById('pdf-cantiqueRepete1').textContent = getValue('cantiqueRepete1');
+        document.getElementById('pdf-cantiqueRepete2').textContent = getValue('cantiqueRepete2');
+        document.getElementById('pdf-cantiqueRepete3').textContent = getValue('cantiqueRepete3');
+        document.getElementById('pdf-cantiqueArrange1').textContent = getValue('cantiqueArrange1');
+        document.getElementById('pdf-cantiqueArrange2').textContent = getValue('cantiqueArrange2');
+        document.getElementById('pdf-cantiqueArrange3').textContent = getValue('cantiqueArrange3');
+        document.getElementById('pdf-cantiqueArrange4').textContent = getValue('cantiqueArrange4');
+        document.getElementById('pdf-objectif').textContent = getValue('objectif');
+        document.getElementById('pdf-remarques').textContent = getValue('remarques');
+        document.getElementById('pdf-rapporteur').textContent = getValue('rapporteur');
+
+        // Remplissage du tableau des effectifs
+        document.getElementById('pdf-alto').textContent = getValue('alto');
+        document.getElementById('pdf-soprano').textContent = getValue('soprano');
+        document.getElementById('pdf-tenor').textContent = getValue('tenor');
+        document.getElementById('pdf-basse').textContent = getValue('basse');
+        document.getElementById('pdf-orchestre').textContent = getValue('orchestre');
+        document.getElementById('pdf-totalGeneral').textContent = totalGeneralInput.value; // Utilise la valeur calculée
+
+        // Gestion des cases à cocher pour les détails techniques
+        const techDetails = ['phrases', 'nuance', 'modulation', 'diction', 'lecturePartition', 'tempo', 'style', 'expression'];
+        techDetails.forEach(detail => {
+            const checkboxElement = document.getElementById(`pdf-${detail}_check`);
+            // Affiche une coche (✓) si la case est cochée, sinon rien.
+            checkboxElement.innerHTML = isChecked(`${detail}_check`) ? '&#10003;' : '';
+        });
+    }
+});
+
+// ... (tout votre code JavaScript existant : handleGeneratePDF, resetForm, etc.) ...
+
+// --- GESTION DES MISES À JOUR DU SERVICE WORKER ---
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+        .then(registration => {
+            console.log('Service Worker enregistré avec succès:', registration.scope);
+
+            // On vérifie s'il y a déjà un Service Worker en attente (waiting)
+            if (registration.waiting) {
+                showUpdateNotification(registration.waiting);
+                return;
+            }
+
+            // On écoute les futures mises à jour
+            registration.addEventListener('updatefound', () => {
+                console.log('Service Worker: Nouvelle version trouvée.');
+                const newWorker = registration.installing;
+                
+                // On attend que le nouveau worker soit installé
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed') {
+                        // Si un nouveau worker est installé et en attente, on affiche la notification
+                        if (navigator.serviceWorker.controller) {
+                            showUpdateNotification(newWorker);
+                        }
+                    }
+                });
+            });
+        })
+        .catch(error => {
+            console.log('Échec de l\'enregistrement du Service Worker:', error);
+        });
+    });
+}
+
+function showUpdateNotification(worker) {
+    const notification = document.getElementById('update-notification');
+    const updateButton = document.getElementById('update-btn');
+
+    notification.classList.add('show');
+
+    updateButton.addEventListener('click', () => {
+        // Envoie le message au Service Worker pour qu'il s'active
+        worker.postMessage({ type: 'SKIP_WAITING' });
+        
+        // Une fois que le nouveau worker a pris le contrôle, on recharge la page
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            window.location.reload();
+        });
+    });
+}
+
+</script>
+</body>
+</html>
