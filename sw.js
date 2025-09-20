@@ -1,80 +1,98 @@
-// Changez le nom du dépôt si le vôtre est différent
-const REPO_NAME = '/generateur-rapport'; 
-const CACHE_VERSION = 'v3'; // Changez ce numéro à chaque mise à jour majeure
-const CACHE_NAME = `rapports-app-cache-${CACHE_VERSION}`;
-
-// Liste de TOUS les fichiers que l'application doit pouvoir utiliser hors ligne
+const CACHE_NAME = 'rapports-repetition-v1.0.0';
 const urlsToCache = [
-  // Pages principales
-  `${REPO_NAME}/`,
-  `${REPO_NAME}/index.html`,
-  `${REPO_NAME}/gestionnaire.html`,
-  
-  // Fichiers de configuration PWA
-  `${REPO_NAME}/manifest.json`,
-  
-  // Images
-  `${REPO_NAME}/R.png`,
-  
-  // Librairies externes (elles doivent aussi être mises en cache)
+  '/',
+  '/index.html',
+  '/gestionnaire.html',
+  'R.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
 
-// Installation du Service Worker et mise en cache des fichiers
+// Installation du Service Worker
 self.addEventListener('install', event => {
-  self.skipWaiting( ); // Force l'activation immédiate du nouveau Service Worker
+  console.log('Service Worker: Installation en cours');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Cache ouvert. Mise en cache des fichiers de base.');
+        console.log('Service Worker: Mise en cache des ressources');
         return cache.addAll(urlsToCache);
       })
-      .catch(error => {
-        console.error('Échec de la mise en cache lors de l\'installation :', error);
+      .then(() => {
+        console.log('Service Worker: Installation terminée');
+        return self.skipWaiting();
       })
   );
 });
 
-// Activation du Service Worker et nettoyage des anciens caches
+// Activation du Service Worker
 self.addEventListener('activate', event => {
+  console.log('Service Worker: Activation en cours');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Suppression de l\'ancien cache :', cacheName);
-            return caches.delete(cacheName);
+        cacheNames.map(cache => {
+          if (cache !== CACHE_NAME) {
+            console.log('Service Worker: Suppression de l\'ancien cache', cache);
+            return caches.delete(cache);
           }
         })
       );
+    }).then(() => {
+      console.log('Service Worker: Activation terminée');
+      return self.clients.claim();
     })
   );
-  return self.clients.claim(); // Prend le contrôle de toutes les pages ouvertes
 });
 
-// Interception des requêtes réseau (stratégie "Cache d'abord")
+// Interception des requêtes
 self.addEventListener('fetch', event => {
-  // On ne met pas en cache les requêtes autres que GET
-  if (event.request.method !== 'GET') {
+  // Ignorer les requêtes non-HTTP/HTTPS (comme les extensions chrome://)
+  if (!event.request.url.startsWith('http')) {
     return;
   }
-
+  
   event.respondWith(
     caches.match(event.request)
-      .then(cachedResponse => {
-        // Si la ressource est dans le cache, on la retourne
-        if (cachedResponse) {
-          return cachedResponse;
+      .then(response => {
+        // Retourne la ressource en cache si disponible
+        if (response) {
+          return response;
         }
-        // Sinon, on la récupère sur le réseau
-        return fetch(event.request).then(networkResponse => {
-            // Optionnel : on peut cloner la réponse et la mettre en cache pour la prochaine fois
-            // let responseToCache = networkResponse.clone();
-            // caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseToCache));
-            return networkResponse;
-        });
+
+        // Sinon, fait la requête réseau
+        return fetch(event.request)
+          .then(response => {
+            // Vérifie si la réponse est valide
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            // Clone la réponse pour la mettre en cache
+            const responseToCache = response.clone();
+
+            caches.open(CACHE_NAME)
+              .then(cache => {
+                // Met en cache les nouvelles ressources
+                cache.put(event.request, responseToCache);
+              });
+
+            return response;
+          })
+          .catch(error => {
+            console.log('Service Worker: Erreur de fetch', error);
+            // Pour les pages, on peut retourner une page d'erreur personnalisée
+            if (event.request.destination === 'document') {
+              return caches.match('/index.html');
+            }
+          });
       })
   );
+});
+
+// Gestion des messages (pour les mises à jour)
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
